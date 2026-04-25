@@ -6,6 +6,7 @@ import logging
 
 import southern_company_api
 from southern_company_api.exceptions import SouthernCompanyException
+from southern_company_api.nicor_parser import NicorGasAPI
 
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
@@ -200,3 +201,33 @@ class SouthernCompanyCoordinator(DataUpdateCoordinator):
 
             async_add_external_statistics(self.hass, cost_metadata, cost_statistics)
             async_add_external_statistics(self.hass, usage_metadata, usage_statistics)
+
+
+class NicorGasCoordinator(DataUpdateCoordinator):
+    """Handle Nicor Gas data updates."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        nicor_gas_api: NicorGasAPI,
+    ) -> None:
+        """Initialize the data handler."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            name="Nicor Gas",
+            update_interval=timedelta(minutes=60),
+        )
+        self._api = nicor_gas_api
+
+    @property
+    def api(self) -> NicorGasAPI:
+        """Access the API."""
+        return self._api
+
+    async def _async_update_data(self) -> southern_company_api.NicorUsageHistory:
+        """Update data via API."""
+        try:
+            return await self._api.get_usage_history()
+        except SouthernCompanyException as ex:
+            raise UpdateFailed("Failed to get Nicor Gas usage history") from ex

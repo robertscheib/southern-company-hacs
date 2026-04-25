@@ -15,11 +15,35 @@
 
 **This component will set up the following platforms.**
 
-| Platform        | Description                               |
-| --------------- | ----------------------------------------- |
-| `binary_sensor` | Show something `True` or `False`.         |
-| `sensor`        | Show info from Southern Company HACS API. |
-| `switch`        | Switch something `True` or `False`.       |
+| Platform | Description                               |
+| -------- | ----------------------------------------- |
+| `sensor` | Show info from Southern Company HACS API. |
+
+## Supported utilities
+
+### Southern Company (Alabama Power, Georgia Power, Mississippi Power)
+
+| Sensor                          | Description                                |
+| ------------------------------- | ------------------------------------------ |
+| Monthly cost                    | Dollars billed to date this billing period |
+| Monthly consumption             | kWh used this billing period               |
+| Average daily cost              | Average daily cost this billing period     |
+| Average daily usage             | Average daily kWh this billing period      |
+| Higher projected monthly usage  | Upper estimate of monthly kWh              |
+| Lower projected monthly usage   | Lower estimate of monthly kWh              |
+| Higher projected monthly cost   | Upper estimate of monthly bill             |
+| Lower projected monthly cost    | Lower estimate of monthly bill             |
+
+### Nicor Gas (LDC 7)
+
+| Sensor                  | Description                                   |
+| ----------------------- | --------------------------------------------- |
+| Billing period therms   | Therms used in the current billing period     |
+| Billing period cost     | Cost accrued in the current billing period    |
+| Projected bill          | Upper estimate of the current month's bill    |
+| Daily therms            | Therms used on the most recent day            |
+| Daily cost              | Cost for the most recent day                  |
+| Next meter read date    | Date of the next scheduled meter read         |
 
 ## Installation
 

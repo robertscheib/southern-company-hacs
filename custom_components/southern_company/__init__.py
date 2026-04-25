@@ -10,6 +10,7 @@ from southern_company_api.exceptions import (
     NoRequestTokenFound,
     NoScTokenFound,
 )
+from southern_company_api.nicor_parser import NicorGasAPI
 from southern_company_api.parser import SouthernCompanyAPI
 
 from homeassistant.config_entries import ConfigEntry
@@ -18,8 +19,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import aiohttp_client
 
-from .const import DOMAIN
-from .coordinator import SouthernCompanyCoordinator
+from .const import (
+    ACCOUNT_TYPE_NICOR_GAS,
+    CONF_ACCOUNT_TYPE,
+    DOMAIN,
+)
+from .coordinator import NicorGasCoordinator, SouthernCompanyCoordinator
 
 PLATFORMS = [Platform.SENSOR]
 failures: dict[str, float] = {}
@@ -34,25 +39,53 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
     hass.data.setdefault(DOMAIN, {})
     session = aiohttp_client.async_create_clientsession(hass)
-    sca = SouthernCompanyAPI(
-        entry.data[CONF_USERNAME],
-        entry.data[CONF_PASSWORD],
-        session,
-    )
-    try:
-        await sca.authenticate()
-    except CantReachSouthernCompany as err:
-        raise ConfigEntryNotReady("Can not connect to the southern company") from err
-    except (NoScTokenFound, NoRequestTokenFound) as err:
-        failures[entry.entry_id] = time.time()
-        raise ConfigEntryNotReady(
-            "Token not found in southern company response. Please double check your credentials or open an issue"
-        ) from err
-    except InvalidLogin as err:
-        raise ConfigEntryAuthFailed("Login incorrect") from err
+
+    account_type = entry.data.get(CONF_ACCOUNT_TYPE, "southern_company")
+
+    if account_type == ACCOUNT_TYPE_NICOR_GAS:
+        api: NicorGasAPI = NicorGasAPI(
+            entry.data[CONF_USERNAME],
+            entry.data[CONF_PASSWORD],
+            session,
+        )
+        try:
+            await api.connect()
+        except CantReachSouthernCompany as err:
+            raise ConfigEntryNotReady("Can not connect to Nicor Gas") from err
+        except (NoScTokenFound, NoRequestTokenFound) as err:
+            failures[entry.entry_id] = time.time()
+            raise ConfigEntryNotReady(
+                "Token not found in Nicor Gas response. Please double check your credentials or open an issue"
+            ) from err
+        except InvalidLogin as err:
+            raise ConfigEntryAuthFailed("Login incorrect") from err
+        coordinator: NicorGasCoordinator | SouthernCompanyCoordinator = (
+            NicorGasCoordinator(hass, api)
+        )
+    else:
+        sca = SouthernCompanyAPI(
+            entry.data[CONF_USERNAME],
+            entry.data[CONF_PASSWORD],
+            session,
+        )
+        try:
+            await sca.authenticate()
+        except CantReachSouthernCompany as err:
+            raise ConfigEntryNotReady(
+                "Can not connect to the southern company"
+            ) from err
+        except (NoScTokenFound, NoRequestTokenFound) as err:
+            failures[entry.entry_id] = time.time()
+            raise ConfigEntryNotReady(
+                "Token not found in southern company response. Please double check your credentials or open an issue"
+            ) from err
+        except InvalidLogin as err:
+            raise ConfigEntryAuthFailed("Login incorrect") from err
+        coordinator = SouthernCompanyCoordinator(hass, sca)
+
     if entry.entry_id in failures:
         failures.pop(entry.entry_id)
-    coordinator = SouthernCompanyCoordinator(hass, sca)
+
     await coordinator.async_config_entry_first_refresh()
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
