@@ -219,9 +219,8 @@ NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
     NicorGasEntityDescription(
         key="billing_period_cost",
         name="Billing period cost",
-        device_class=SensorDeviceClass.MONETARY,
         suggested_display_precision=2,
-        native_unit_of_measurement=CURRENCY_DOLLAR,
+        native_unit_of_measurement="USD/ft³",
         value_fn=_current_billing_period_cost,
     ),
     NicorGasEntityDescription(
@@ -245,9 +244,8 @@ NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
     NicorGasEntityDescription(
         key="daily_cost",
         name="Daily cost",
-        device_class=SensorDeviceClass.MONETARY,
         suggested_display_precision=2,
-        native_unit_of_measurement=CURRENCY_DOLLAR,
+        native_unit_of_measurement="USD/ft³",
         value_fn=_most_recent_daily_cost,
     ),
     NicorGasEntityDescription(
