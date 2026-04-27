@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 import datetime
+from typing import Any
 
 import southern_company_api
 
@@ -15,7 +16,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_USERNAME, CURRENCY_DOLLAR, UnitOfEnergy
+from homeassistant.const import CONF_USERNAME, CURRENCY_DOLLAR, UnitOfEnergy, UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -119,6 +120,10 @@ class NicorGasEntityDescriptionMixin:
         [southern_company_api.NicorUsageHistory],
         StateType | datetime.date,
     ]
+    attr_fn: Callable[
+        [southern_company_api.NicorUsageHistory],
+        dict[str, Any] | None,
+    ] | None = None
 
 
 @dataclass(frozen=True)
@@ -128,13 +133,20 @@ class NicorGasEntityDescription(
     """Describes Nicor Gas sensor entity."""
 
 
-def _current_billing_period_therms(
+def _billing_period_ccfs(
     data: southern_company_api.NicorUsageHistory,
 ) -> float | None:
-    if not data.daily_usage:
+    if not data.billing_periods:
         return None
-    current_period = max(data.daily_usage, key=lambda d: d.date).billing_period
-    return sum(d.therms for d in data.daily_usage if d.billing_period == current_period)
+    return max(data.billing_periods, key=lambda p: p.date).ccfs
+
+
+def _billing_period_therms_attrs(
+    data: southern_company_api.NicorUsageHistory,
+) -> dict[str, float] | None:
+    if not data.billing_periods:
+        return None
+    return {"therms": max(data.billing_periods, key=lambda p: p.date).therms}
 
 
 def _current_billing_period_cost(
@@ -146,12 +158,21 @@ def _current_billing_period_cost(
     return sum(d.cost for d in data.daily_usage if d.billing_period == current_period)
 
 
-def _most_recent_daily_therms(
+def _most_recent_daily_ccfs(
     data: southern_company_api.NicorUsageHistory,
 ) -> float | None:
     if not data.daily_usage:
         return None
-    return max(data.daily_usage, key=lambda d: d.date).therms
+    # Per-day CCf is not in the API; approximated from therms (1 CCf ≈ 1.02 therms)
+    return max(data.daily_usage, key=lambda d: d.date).therms / 1.02
+
+
+def _most_recent_daily_therms_attrs(
+    data: southern_company_api.NicorUsageHistory,
+) -> dict[str, float] | None:
+    if not data.daily_usage:
+        return None
+    return {"therms": max(data.daily_usage, key=lambda d: d.date).therms}
 
 
 def _most_recent_daily_cost(
@@ -172,12 +193,13 @@ def _next_meter_read_date(
 
 NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
     NicorGasEntityDescription(
-        key="billing_period_therms",
-        name="Billing period therms",
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement="therm",
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=_current_billing_period_therms,
+        key="billing_period_gas",
+        name="Billing period gas",
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_FEET,
+        state_class=SensorStateClass.TOTAL,
+        value_fn=_billing_period_ccfs,
+        attr_fn=_billing_period_therms_attrs,
     ),
     NicorGasEntityDescription(
         key="billing_period_cost",
@@ -197,12 +219,13 @@ NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
         value_fn=lambda data: data.projected_bill.high_amount,
     ),
     NicorGasEntityDescription(
-        key="daily_therms",
-        name="Daily therms",
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement="therm",
+        key="daily_gas",
+        name="Daily gas",
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_FEET,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=_most_recent_daily_therms,
+        value_fn=_most_recent_daily_ccfs,
+        attr_fn=_most_recent_daily_therms_attrs,
     ),
     NicorGasEntityDescription(
         key="daily_cost",
@@ -315,6 +338,13 @@ class NicorGasSensor(SensorEntity, CoordinatorEntity[NicorGasCoordinator]):
         self.entity_description: NicorGasEntityDescription = description
         self._attr_unique_id = f"nicor_gas_{meter_id}_{description.key}"
         self._attr_device_info = device
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return additional state attributes."""
+        if self.coordinator.data is not None and self.entity_description.attr_fn is not None:
+            return self.entity_description.attr_fn(self.coordinator.data)
+        return None
 
     @property
     def native_value(self) -> StateType | datetime.date:
