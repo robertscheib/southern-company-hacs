@@ -6,7 +6,6 @@ from collections.abc import Mapping
 import logging
 from typing import Any
 
-from southern_company_api.nicor_parser import NicorGasAPI
 from southern_company_api.parser import (
     CantReachSouthernCompany,
     InvalidLogin,
@@ -65,6 +64,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         account_type = user_input.get(CONF_ACCOUNT_TYPE, ACCOUNT_TYPE_SOUTHERN_COMPANY)
 
         if account_type == ACCOUNT_TYPE_NICOR_GAS:
+            from southern_company_api.nicor_parser import NicorGasAPI  # noqa: PLC0415
             api = NicorGasAPI(
                 user_input[CONF_USERNAME],
                 user_input[CONF_PASSWORD],

@@ -10,7 +10,6 @@ from southern_company_api.exceptions import (
     NoRequestTokenFound,
     NoScTokenFound,
 )
-from southern_company_api.nicor_parser import NicorGasAPI
 from southern_company_api.parser import SouthernCompanyAPI
 
 from homeassistant.config_entries import ConfigEntry
@@ -43,6 +42,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     account_type = entry.data.get(CONF_ACCOUNT_TYPE, "southern_company")
 
     if account_type == ACCOUNT_TYPE_NICOR_GAS:
+        from southern_company_api.nicor_parser import NicorGasAPI  # noqa: PLC0415
         api: NicorGasAPI = NicorGasAPI(
             entry.data[CONF_USERNAME],
             entry.data[CONF_PASSWORD],
