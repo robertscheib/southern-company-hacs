@@ -16,7 +16,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_USERNAME, CURRENCY_DOLLAR, UnitOfEnergy, UnitOfVolume
+from homeassistant.const import CONF_USERNAME, CURRENCY_DOLLAR, UnitOfEnergy, UnitOfTemperature, UnitOfTime, UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -206,6 +206,47 @@ def _next_meter_read_date(
     return data.meter_info.next_read_date.date()
 
 
+def _most_recent_daily_avg_temp(
+    data: southern_company_api.NicorUsageHistory,
+) -> float | None:
+    if not data.daily_usage:
+        return None
+    return max(data.daily_usage, key=lambda d: d.date).avg_temp
+
+
+def _most_recent_daily_meter_read(
+    data: southern_company_api.NicorUsageHistory,
+) -> float | None:
+    if not data.daily_usage:
+        return None
+    return max(data.daily_usage, key=lambda d: d.date).meter_read
+
+
+def _most_recent_daily_read_type(
+    data: southern_company_api.NicorUsageHistory,
+) -> str | None:
+    if not data.daily_usage:
+        return None
+    return max(data.daily_usage, key=lambda d: d.date).read_type
+
+
+def _current_billing_period_days(
+    data: southern_company_api.NicorUsageHistory,
+) -> int | None:
+    if not data.billing_periods:
+        return None
+    return max(data.billing_periods, key=lambda p: p.date).days_used
+
+
+def _prev_billing_period_therms(
+    data: southern_company_api.NicorUsageHistory,
+) -> float | None:
+    if len(data.billing_periods) < 2:
+        return None
+    sorted_periods = sorted(data.billing_periods, key=lambda p: p.date, reverse=True)
+    return sorted_periods[1].therms
+
+
 NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
     NicorGasEntityDescription(
         key="billing_period_gas",
@@ -253,6 +294,48 @@ NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
         name="Next meter read date",
         device_class=SensorDeviceClass.DATE,
         value_fn=_next_meter_read_date,
+    ),
+    NicorGasEntityDescription(
+        key="daily_avg_temp",
+        name="Daily average temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_most_recent_daily_avg_temp,
+    ),
+    NicorGasEntityDescription(
+        key="daily_meter_reading",
+        name="Daily meter reading",
+        native_unit_of_measurement=UnitOfVolume.CUBIC_FEET,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_most_recent_daily_meter_read,
+    ),
+    NicorGasEntityDescription(
+        key="daily_read_type",
+        name="Daily read type",
+        value_fn=_most_recent_daily_read_type,
+    ),
+    NicorGasEntityDescription(
+        key="billing_period_days",
+        name="Days in billing period",
+        native_unit_of_measurement=UnitOfTime.DAYS,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_current_billing_period_days,
+    ),
+    NicorGasEntityDescription(
+        key="billing_period_ccf",
+        name="Billing period CCf",
+        device_class=SensorDeviceClass.GAS,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_FEET,
+        state_class=SensorStateClass.TOTAL,
+        value_fn=_billing_period_ccfs,
+    ),
+    NicorGasEntityDescription(
+        key="prev_billing_period_therms",
+        name="Previous billing period therms",
+        native_unit_of_measurement="thm",
+        state_class=SensorStateClass.TOTAL,
+        value_fn=_prev_billing_period_therms,
     ),
 )
 
