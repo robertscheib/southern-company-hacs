@@ -238,7 +238,7 @@ NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
         name="Daily gas",
         device_class=SensorDeviceClass.GAS,
         native_unit_of_measurement=UnitOfVolume.CUBIC_FEET,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL_INCREASING,
         value_fn=_most_recent_daily_ccfs,
         attr_fn=_most_recent_daily_therms_attrs,
     ),
