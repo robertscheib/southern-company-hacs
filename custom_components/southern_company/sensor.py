@@ -112,7 +112,7 @@ SENSORS: tuple[SouthernCompanyEntityDescription, ...] = (
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class NicorGasEntityDescriptionMixin:
     """Mixin for required keys."""
 
@@ -131,6 +131,19 @@ class NicorGasEntityDescription(
     SensorEntityDescription, NicorGasEntityDescriptionMixin
 ):
     """Describes Nicor Gas sensor entity."""
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """Convert value to float, stripping currency symbols; return default on failure."""
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    cleaned = str(value).replace("$", "").replace(",", "").strip()
+    try:
+        return float(cleaned)
+    except (ValueError, TypeError):
+        return default
 
 
 def _billing_period_ccfs(
@@ -155,7 +168,9 @@ def _current_billing_period_cost(
     if not data.daily_usage:
         return None
     current_period = max(data.daily_usage, key=lambda d: d.date).billing_period
-    return sum(d.cost for d in data.daily_usage if d.billing_period == current_period)
+    return sum(
+        _safe_float(d.cost) for d in data.daily_usage if d.billing_period == current_period
+    )
 
 
 def _most_recent_daily_ccfs(
@@ -180,7 +195,7 @@ def _most_recent_daily_cost(
 ) -> float | None:
     if not data.daily_usage:
         return None
-    return max(data.daily_usage, key=lambda d: d.date).cost
+    return _safe_float(max(data.daily_usage, key=lambda d: d.date).cost)
 
 
 def _next_meter_read_date(
