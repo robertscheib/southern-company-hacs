@@ -126,7 +126,7 @@ class NicorGasEntityDescriptionMixin:
     ] | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class NicorGasEntityDescription(
     SensorEntityDescription, NicorGasEntityDescriptionMixin
 ):
