@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 
 from southern_company_api.exceptions import (
@@ -24,6 +25,9 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import NicorGasCoordinator, SouthernCompanyCoordinator
+from .statistics import async_import_nicor_statistics
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR]
 failures: dict[str, float] = {}
@@ -88,6 +92,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
     hass.data[DOMAIN][entry.entry_id] = coordinator
+
+    if (
+        account_type == ACCOUNT_TYPE_NICOR_GAS
+        and not entry.options.get("nicor_statistics_imported", False)
+    ):
+        try:
+            await async_import_nicor_statistics(hass, coordinator.data)  # type: ignore[arg-type]
+            hass.config_entries.async_update_entry(
+                entry,
+                options={**entry.options, "nicor_statistics_imported": True},
+            )
+        except Exception as err:
+            _LOGGER.warning("Failed to import Nicor Gas historical statistics: %s", err)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
