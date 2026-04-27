@@ -59,7 +59,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_authenticate(
         self, user_input: Mapping[str, Any], errors: dict[str, str]
-    ) -> ConfigFlowResult:
+    ) -> ConfigFlowResult | None:
         """Handle authentication for all flows to reduce repetition of code."""
         account_type = user_input.get(CONF_ACCOUNT_TYPE, ACCOUNT_TYPE_SOUTHERN_COMPANY)
 
@@ -97,6 +97,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
             title = "Southern Company Hacs"
 
+        if errors:
+            return None
         return self.async_create_entry(title=title, data=user_input)
 
     async def async_step_user(
