@@ -15,7 +15,7 @@ from southern_company_api.parser import SouthernCompanyAPI
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import aiohttp_client
 
@@ -106,6 +106,45 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except Exception as err:
             _LOGGER.warning("Failed to import Nicor Gas historical statistics: %s", err)
 
+    if account_type == ACCOUNT_TYPE_NICOR_GAS and not hass.services.has_service(
+        DOMAIN, "reset_nicor_statistics"
+    ):
+        async def _handle_reset_nicor_statistics(call: ServiceCall) -> None:
+            for entry_id, coord in hass.data.get(DOMAIN, {}).items():
+                if not isinstance(coord, NicorGasCoordinator):
+                    continue
+                config_entry = hass.config_entries.async_get_entry(entry_id)
+                if config_entry is None:
+                    continue
+                hass.config_entries.async_update_entry(
+                    config_entry,
+                    options={**config_entry.options, "nicor_statistics_imported": False},
+                )
+                data = coord.data
+                if data is None:
+                    _LOGGER.warning(
+                        "No Nicor Gas data cached for entry %s; trigger a coordinator refresh first",
+                        entry_id,
+                    )
+                    continue
+                try:
+                    await async_import_nicor_statistics(hass, data)
+                    hass.config_entries.async_update_entry(
+                        config_entry,
+                        options={**config_entry.options, "nicor_statistics_imported": True},
+                    )
+                    _LOGGER.info(
+                        "Nicor Gas statistics reimported for entry %s", entry_id
+                    )
+                except Exception as err:
+                    _LOGGER.warning(
+                        "Failed to reimport Nicor Gas statistics for entry %s: %s",
+                        entry_id,
+                        err,
+                    )
+
+        hass.services.async_register(DOMAIN, "reset_nicor_statistics", _handle_reset_nicor_statistics)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
@@ -115,5 +154,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
+
+    remaining_nicor = any(
+        isinstance(c, NicorGasCoordinator)
+        for c in hass.data.get(DOMAIN, {}).values()
+    )
+    if not remaining_nicor and hass.services.has_service(DOMAIN, "reset_nicor_statistics"):
+        hass.services.async_remove(DOMAIN, "reset_nicor_statistics")
 
     return unload_ok

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 from datetime import timedelta
 import logging
@@ -239,6 +240,7 @@ class NicorGasCoordinator(DataUpdateCoordinator):
             )
             try:
                 await self._api.connect()
+                await asyncio.sleep(2)
                 return await self._api.get_usage_history()
             except Exception as reconnect_ex:
                 _LOGGER.exception(
