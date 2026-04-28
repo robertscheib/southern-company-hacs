@@ -10,7 +10,7 @@ import southern_company_api
 from southern_company_api.nicor_account import NicorBillingPeriod, NicorDailyUsage, NicorUsageHistory
 
 from homeassistant.components.recorder import get_instance
-from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
+from homeassistant.components.recorder.models import StatisticData, StatisticMetaData, StatisticMeanType
 from homeassistant.components.recorder.statistics import async_add_external_statistics
 from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant
@@ -102,6 +102,7 @@ def _import_daily_statistics(
         StatisticMetaData(
             has_mean=False,
             has_sum=True,
+            mean_type=StatisticMeanType.NONE,
             name="Nicor Gas daily gas",
             source=DOMAIN,
             statistic_id=STAT_DAILY_GAS,
@@ -114,6 +115,7 @@ def _import_daily_statistics(
         StatisticMetaData(
             has_mean=False,
             has_sum=True,
+            mean_type=StatisticMeanType.NONE,
             name="Nicor Gas daily cost",
             source=DOMAIN,
             statistic_id=STAT_DAILY_COST,
@@ -151,6 +153,7 @@ def _import_billing_period_statistics(
         StatisticMetaData(
             has_mean=False,
             has_sum=True,
+            mean_type=StatisticMeanType.NONE,
             name="Nicor Gas billing period gas",
             source=DOMAIN,
             statistic_id=STAT_BILLING_GAS,
@@ -163,6 +166,7 @@ def _import_billing_period_statistics(
         StatisticMetaData(
             has_mean=False,
             has_sum=True,
+            mean_type=StatisticMeanType.NONE,
             name="Nicor Gas billing period cost",
             source=DOMAIN,
             statistic_id=STAT_BILLING_COST,
