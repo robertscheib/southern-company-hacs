@@ -107,6 +107,7 @@ def _import_daily_statistics(
             source=DOMAIN,
             statistic_id=STAT_DAILY_GAS,
             unit_of_measurement=UnitOfVolume.CUBIC_FEET,
+            unit_class="volume",
         ),
         gas_stats,
     )
@@ -120,6 +121,7 @@ def _import_daily_statistics(
             source=DOMAIN,
             statistic_id=STAT_DAILY_COST,
             unit_of_measurement=None,
+            unit_class=None,
         ),
         cost_stats,
     )
@@ -158,6 +160,7 @@ def _import_billing_period_statistics(
             source=DOMAIN,
             statistic_id=STAT_BILLING_GAS,
             unit_of_measurement=UnitOfVolume.CUBIC_FEET,
+            unit_class="volume",
         ),
         gas_stats,
     )
@@ -171,6 +174,7 @@ def _import_billing_period_statistics(
             source=DOMAIN,
             statistic_id=STAT_BILLING_COST,
             unit_of_measurement=None,
+            unit_class=None,
         ),
         cost_stats,
     )
