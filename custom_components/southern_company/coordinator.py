@@ -122,9 +122,6 @@ class SouthernCompanyCoordinator(DataUpdateCoordinator):
                     None,
                     {"sum"},
                 )
-                _LOGGER.warning(cost_stat)
-                _LOGGER.warning("HERE")
-                _LOGGER.info(cost_stat)
                 if cost_statistic_id not in cost_stat:
                     _LOGGER.warning(
                         "Something went wrong while getting the statistics. Manually reloading"

@@ -119,7 +119,7 @@ def _import_daily_statistics(
             name="Nicor Gas daily cost",
             source=DOMAIN,
             statistic_id=STAT_DAILY_COST,
-            unit_of_measurement="USD/ft³",
+            unit_of_measurement=None,
         ),
         cost_stats,
     )
@@ -170,7 +170,7 @@ def _import_billing_period_statistics(
             name="Nicor Gas billing period cost",
             source=DOMAIN,
             statistic_id=STAT_BILLING_COST,
-            unit_of_measurement="USD/ft³",
+            unit_of_measurement=None,
         ),
         cost_stats,
     )
