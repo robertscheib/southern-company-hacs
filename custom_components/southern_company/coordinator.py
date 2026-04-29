@@ -231,26 +231,11 @@ class NicorGasCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> southern_company_api.NicorUsageHistory:
         """Update data via API."""
         try:
+            await self._api.connect()
+            await asyncio.sleep(10)
             return await self._api.get_usage_history()
-        except SouthernCompanyException as ex:
-            _LOGGER.warning(
-                "Nicor Gas data fetch failed (%s: %s); attempting session reconnect",
-                type(ex).__name__,
-                ex,
-            )
-            try:
-                await self._api.connect()
-                await asyncio.sleep(2)
-                return await self._api.get_usage_history()
-            except Exception as reconnect_ex:
-                _LOGGER.exception(
-                    "Nicor Gas reconnect failed after initial fetch error"
-                )
-                raise UpdateFailed(
-                    f"Failed to get Nicor Gas usage history: {reconnect_ex}"
-                ) from reconnect_ex
         except Exception as ex:
             _LOGGER.exception("Unexpected error fetching Nicor Gas usage history")
             raise UpdateFailed(
-                f"Unexpected error fetching Nicor Gas data: {ex}"
+                f"Failed to get Nicor Gas usage history: {ex}"
             ) from ex
