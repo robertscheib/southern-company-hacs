@@ -124,6 +124,7 @@ class NicorGasEntityDescriptionMixin:
         [southern_company_api.NicorUsageHistory],
         dict[str, Any] | None,
     ] | None = None
+    statistic_id: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -281,6 +282,7 @@ NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL_INCREASING,
         value_fn=_most_recent_daily_ccfs,
         attr_fn=_most_recent_daily_therms_attrs,
+        statistic_id=f"{DOMAIN}:nicor_gas_daily_gas",
     ),
     NicorGasEntityDescription(
         key="daily_cost",
@@ -288,6 +290,7 @@ NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
         suggested_display_precision=2,
         native_unit_of_measurement="USD/ft³",
         value_fn=_most_recent_daily_cost,
+        statistic_id=f"{DOMAIN}:nicor_gas_daily_cost",
     ),
     NicorGasEntityDescription(
         key="next_meter_read_date",
@@ -434,6 +437,8 @@ class NicorGasSensor(SensorEntity, CoordinatorEntity[NicorGasCoordinator]):
         self.entity_description: NicorGasEntityDescription = description
         self._attr_unique_id = f"nicor_gas_{meter_id}_{description.key}"
         self._attr_device_info = device
+        if description.statistic_id is not None:
+            self._attr_statistic_id = description.statistic_id
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
