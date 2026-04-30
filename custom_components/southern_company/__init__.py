@@ -120,14 +120,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     config_entry,
                     options={**config_entry.options, "nicor_statistics_imported": False},
                 )
-                data = coord.data
-                if data is None:
-                    _LOGGER.warning(
-                        "No Nicor Gas data cached for entry %s; trigger a coordinator refresh first",
-                        entry_id,
-                    )
-                    continue
                 try:
+                    await coord.async_refresh()
+                    data = coord.data
+                    if data is None:
+                        _LOGGER.warning(
+                            "No Nicor Gas data available for entry %s after refresh",
+                            entry_id,
+                        )
+                        continue
                     await async_import_nicor_statistics(hass, data)
                     hass.config_entries.async_update_entry(
                         config_entry,
