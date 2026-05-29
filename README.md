@@ -38,10 +38,10 @@
 
 | Sensor                  | Description                                   |
 | ----------------------- | --------------------------------------------- |
-| Billing period therms   | Therms used in the current billing period     |
+| Billing period gas (ft³) | Gas used in the current billing period        |
 | Billing period cost     | Cost accrued in the current billing period    |
 | Projected bill          | Upper estimate of the current month's bill    |
-| Daily therms            | Therms used on the most recent day            |
+| Daily gas (ft³)         | Gas used on the most recent day               |
 | Daily cost              | Cost for the most recent day                  |
 | Next meter read date    | Date of the next scheduled meter read         |
 
