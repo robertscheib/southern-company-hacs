@@ -124,6 +124,10 @@ class NicorGasEntityDescriptionMixin:
         [southern_company_api.NicorUsageHistory],
         dict[str, Any] | None,
     ] | None = None
+    last_reset_fn: Callable[
+        [southern_company_api.NicorUsageHistory],
+        datetime.datetime | None,
+    ] | None = None
     statistic_id: str | None = None
 
 
@@ -248,6 +252,27 @@ def _prev_billing_period_therms(
     return sorted_periods[1].therms
 
 
+def _billing_period_last_reset(
+    data: southern_company_api.NicorUsageHistory,
+) -> datetime.datetime | None:
+    if not data.billing_periods:
+        return None
+    latest = max(data.billing_periods, key=lambda p: p.date)
+    start_date = latest.date - datetime.timedelta(days=latest.days_used - 1)
+    return datetime.datetime(
+        start_date.year, start_date.month, start_date.day,
+        tzinfo=datetime.timezone.utc,
+    )
+
+
+def _projected_bill_amount(
+    data: southern_company_api.NicorUsageHistory,
+) -> float | None:
+    if not data.projected_bill:
+        return None
+    return _safe_float(data.projected_bill.high_amount)
+
+
 NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
     NicorGasEntityDescription(
         key="billing_period_gas",
@@ -257,6 +282,7 @@ NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         value_fn=_billing_period_ccfs,
         attr_fn=_billing_period_therms_attrs,
+        last_reset_fn=_billing_period_last_reset,
     ),
     NicorGasEntityDescription(
         key="billing_period_cost",
@@ -272,7 +298,8 @@ NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
         suggested_display_precision=2,
         state_class=SensorStateClass.TOTAL,
         native_unit_of_measurement=CURRENCY_DOLLAR,
-        value_fn=lambda data: data.projected_bill.high_amount,
+        value_fn=_projected_bill_amount,
+        last_reset_fn=_billing_period_last_reset,
     ),
     NicorGasEntityDescription(
         key="daily_gas",
@@ -332,6 +359,7 @@ NICOR_SENSORS: tuple[NicorGasEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfVolume.CUBIC_FEET,
         state_class=SensorStateClass.TOTAL,
         value_fn=_billing_period_ccfs,
+        last_reset_fn=_billing_period_last_reset,
     ),
     NicorGasEntityDescription(
         key="prev_billing_period_therms",
@@ -445,6 +473,13 @@ class NicorGasSensor(SensorEntity, CoordinatorEntity[NicorGasCoordinator]):
         """Return additional state attributes."""
         if self.coordinator.data is not None and self.entity_description.attr_fn is not None:
             return self.entity_description.attr_fn(self.coordinator.data)
+        return None
+
+    @property
+    def last_reset(self) -> datetime.datetime | None:
+        """Return the time when the sensor was last reset."""
+        if self.coordinator.data is not None and self.entity_description.last_reset_fn is not None:
+            return self.entity_description.last_reset_fn(self.coordinator.data)
         return None
 
     @property
