@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 
 from southern_company_api.exceptions import (
@@ -14,12 +15,19 @@ from southern_company_api.parser import SouthernCompanyAPI
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import aiohttp_client
 
-from .const import DOMAIN
-from .coordinator import SouthernCompanyCoordinator
+from .const import (
+    ACCOUNT_TYPE_NICOR_GAS,
+    CONF_ACCOUNT_TYPE,
+    DOMAIN,
+)
+from .coordinator import NicorGasCoordinator, SouthernCompanyCoordinator
+from .statistics import async_import_nicor_statistics
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR]
 failures: dict[str, float] = {}
@@ -34,27 +42,109 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
     hass.data.setdefault(DOMAIN, {})
     session = aiohttp_client.async_create_clientsession(hass)
-    sca = SouthernCompanyAPI(
-        entry.data[CONF_USERNAME],
-        entry.data[CONF_PASSWORD],
-        session,
-    )
-    try:
-        await sca.authenticate()
-    except CantReachSouthernCompany as err:
-        raise ConfigEntryNotReady("Can not connect to the southern company") from err
-    except (NoScTokenFound, NoRequestTokenFound) as err:
-        failures[entry.entry_id] = time.time()
-        raise ConfigEntryNotReady(
-            "Token not found in southern company response. Please double check your credentials or open an issue"
-        ) from err
-    except InvalidLogin as err:
-        raise ConfigEntryAuthFailed("Login incorrect") from err
+
+    account_type = entry.data.get(CONF_ACCOUNT_TYPE, "southern_company")
+
+    if account_type == ACCOUNT_TYPE_NICOR_GAS:
+        from southern_company_api.nicor_parser import NicorGasAPI  # noqa: PLC0415
+        api: NicorGasAPI = NicorGasAPI(
+            entry.data[CONF_USERNAME],
+            entry.data[CONF_PASSWORD],
+            session,
+        )
+        try:
+            await api.connect()
+        except CantReachSouthernCompany as err:
+            raise ConfigEntryNotReady("Can not connect to Nicor Gas") from err
+        except (NoScTokenFound, NoRequestTokenFound) as err:
+            failures[entry.entry_id] = time.time()
+            raise ConfigEntryNotReady(
+                "Token not found in Nicor Gas response. Please double check your credentials or open an issue"
+            ) from err
+        except InvalidLogin as err:
+            raise ConfigEntryAuthFailed("Login incorrect") from err
+        coordinator: NicorGasCoordinator | SouthernCompanyCoordinator = (
+            NicorGasCoordinator(hass, api)
+        )
+    else:
+        sca = SouthernCompanyAPI(
+            entry.data[CONF_USERNAME],
+            entry.data[CONF_PASSWORD],
+            session,
+        )
+        try:
+            await sca.authenticate()
+        except CantReachSouthernCompany as err:
+            raise ConfigEntryNotReady(
+                "Can not connect to the southern company"
+            ) from err
+        except (NoScTokenFound, NoRequestTokenFound) as err:
+            failures[entry.entry_id] = time.time()
+            raise ConfigEntryNotReady(
+                "Token not found in southern company response. Please double check your credentials or open an issue"
+            ) from err
+        except InvalidLogin as err:
+            raise ConfigEntryAuthFailed("Login incorrect") from err
+        coordinator = SouthernCompanyCoordinator(hass, sca)
+
     if entry.entry_id in failures:
         failures.pop(entry.entry_id)
-    coordinator = SouthernCompanyCoordinator(hass, sca)
+
     await coordinator.async_config_entry_first_refresh()
     hass.data[DOMAIN][entry.entry_id] = coordinator
+
+    if (
+        account_type == ACCOUNT_TYPE_NICOR_GAS
+        and not entry.options.get("nicor_statistics_imported", False)
+    ):
+        try:
+            await async_import_nicor_statistics(hass, coordinator.data)  # type: ignore[arg-type]
+            hass.config_entries.async_update_entry(
+                entry,
+                options={**entry.options, "nicor_statistics_imported": True},
+            )
+        except Exception as err:
+            _LOGGER.warning("Failed to import Nicor Gas historical statistics: %s", err)
+
+    if account_type == ACCOUNT_TYPE_NICOR_GAS and not hass.services.has_service(
+        DOMAIN, "reset_nicor_statistics"
+    ):
+        async def _handle_reset_nicor_statistics(call: ServiceCall) -> None:
+            for entry_id, coord in hass.data.get(DOMAIN, {}).items():
+                if not isinstance(coord, NicorGasCoordinator):
+                    continue
+                config_entry = hass.config_entries.async_get_entry(entry_id)
+                if config_entry is None:
+                    continue
+                hass.config_entries.async_update_entry(
+                    config_entry,
+                    options={**config_entry.options, "nicor_statistics_imported": False},
+                )
+                try:
+                    await coord.async_refresh()
+                    data = coord.data
+                    if data is None:
+                        _LOGGER.warning(
+                            "No Nicor Gas data available for entry %s after refresh",
+                            entry_id,
+                        )
+                        continue
+                    await async_import_nicor_statistics(hass, data)
+                    hass.config_entries.async_update_entry(
+                        config_entry,
+                        options={**config_entry.options, "nicor_statistics_imported": True},
+                    )
+                    _LOGGER.info(
+                        "Nicor Gas statistics reimported for entry %s", entry_id
+                    )
+                except Exception as err:
+                    _LOGGER.warning(
+                        "Failed to reimport Nicor Gas statistics for entry %s: %s",
+                        entry_id,
+                        err,
+                    )
+
+        hass.services.async_register(DOMAIN, "reset_nicor_statistics", _handle_reset_nicor_statistics)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -65,5 +155,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
+
+    remaining_nicor = any(
+        isinstance(c, NicorGasCoordinator)
+        for c in hass.data.get(DOMAIN, {}).values()
+    )
+    if not remaining_nicor and hass.services.has_service(DOMAIN, "reset_nicor_statistics"):
+        hass.services.async_remove(DOMAIN, "reset_nicor_statistics")
 
     return unload_ok
