@@ -89,7 +89,7 @@ def _import_daily_statistics(
 
     for day in daily:
         # Normalise to midnight UTC so each day gets one statistic slot.
-        start = day.date.replace(hour=0, minute=0, second=0, microsecond=0)
+        start = day.date.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
         ccf = day.therms / 1.02
         cost = _safe_float(day.cost)
         gas_sum += ccf
