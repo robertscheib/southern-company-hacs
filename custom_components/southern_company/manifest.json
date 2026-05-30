@@ -10,7 +10,7 @@
   "loggers": ["southern_company"],
   "quality_scale": "bronze",
   "requirements": [
-    "southern-company-api @ git+https://github.com/robertscheib/southern_company_api.git@nicor-gas-support"
+    "southern-company-api @ git+https://github.com/robertscheib/southern_company_api.git@0b3a6e3fc907779223544ef1fc61b250b587cd57"
   ],
   "version": "1.1.0"
 }
