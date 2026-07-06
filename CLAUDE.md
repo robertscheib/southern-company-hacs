@@ -10,7 +10,7 @@ HACS custom integration for Home Assistant that pulls utility data from Southern
 - **Project root**: `~/projects/southern-company-hacs/`
 - **Language**: Python
 - **HA custom component**: `custom_components/southern_company/`
-- **GitHub**: https://github.com/robertscheib/southern-company-hacs (public)
+- **GitHub**: https://github.com/tempeduck/southern-company-hacs (public)
 
 ## Deployment
 
