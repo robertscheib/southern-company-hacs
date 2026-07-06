@@ -33,6 +33,16 @@ PLATFORMS = [Platform.SENSOR]
 failures: dict[str, float] = {}
 
 
+async def _async_import_nicor_statistics_safe(
+    hass: HomeAssistant, data: object
+) -> None:
+    """Import Nicor Gas statistics, logging (not raising) on failure."""
+    try:
+        await async_import_nicor_statistics(hass, data)  # type: ignore[arg-type]
+    except Exception as err:
+        _LOGGER.warning("Failed to import Nicor Gas statistics: %s", err)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Southern Company from a config entry."""
     if entry.entry_id in failures:
@@ -93,18 +103,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    if (
-        account_type == ACCOUNT_TYPE_NICOR_GAS
-        and not entry.options.get("nicor_statistics_imported", False)
-    ):
-        try:
-            await async_import_nicor_statistics(hass, coordinator.data)  # type: ignore[arg-type]
-            hass.config_entries.async_update_entry(
-                entry,
-                options={**entry.options, "nicor_statistics_imported": True},
-            )
-        except Exception as err:
-            _LOGGER.warning("Failed to import Nicor Gas historical statistics: %s", err)
+    if account_type == ACCOUNT_TYPE_NICOR_GAS:
+        # Import on first setup (backfill), then keep the external long-term
+        # statistics current on every subsequent coordinator refresh -- a
+        # one-time import left the Energy Dashboard stuck on stale data
+        # after the initial backfill.
+        await _async_import_nicor_statistics_safe(hass, coordinator.data)
+
+        def _on_nicor_update() -> None:
+            if coordinator.data is not None:
+                hass.async_create_task(
+                    _async_import_nicor_statistics_safe(hass, coordinator.data)
+                )
+
+        entry.async_on_unload(coordinator.async_add_listener(_on_nicor_update))
 
     if account_type == ACCOUNT_TYPE_NICOR_GAS and not hass.services.has_service(
         DOMAIN, "reset_nicor_statistics"
@@ -113,36 +125,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             for entry_id, coord in hass.data.get(DOMAIN, {}).items():
                 if not isinstance(coord, NicorGasCoordinator):
                     continue
-                config_entry = hass.config_entries.async_get_entry(entry_id)
-                if config_entry is None:
-                    continue
-                hass.config_entries.async_update_entry(
-                    config_entry,
-                    options={**config_entry.options, "nicor_statistics_imported": False},
-                )
-                try:
-                    await coord.async_refresh()
-                    data = coord.data
-                    if data is None:
-                        _LOGGER.warning(
-                            "No Nicor Gas data available for entry %s after refresh",
-                            entry_id,
-                        )
-                        continue
-                    await async_import_nicor_statistics(hass, data)
-                    hass.config_entries.async_update_entry(
-                        config_entry,
-                        options={**config_entry.options, "nicor_statistics_imported": True},
-                    )
-                    _LOGGER.info(
-                        "Nicor Gas statistics reimported for entry %s", entry_id
-                    )
-                except Exception as err:
+                await coord.async_refresh()
+                if coord.data is None:
                     _LOGGER.warning(
-                        "Failed to reimport Nicor Gas statistics for entry %s: %s",
+                        "No Nicor Gas data available for entry %s after refresh",
                         entry_id,
-                        err,
                     )
+                    continue
+                await _async_import_nicor_statistics_safe(hass, coord.data)
+                _LOGGER.info("Nicor Gas statistics reimported for entry %s", entry_id)
 
         hass.services.async_register(DOMAIN, "reset_nicor_statistics", _handle_reset_nicor_statistics)
 
