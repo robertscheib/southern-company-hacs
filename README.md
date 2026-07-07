@@ -36,14 +36,14 @@
 
 ### Nicor Gas (LDC 7)
 
-| Sensor                  | Description                                   |
-| ----------------------- | --------------------------------------------- |
-| Billing period gas (ft³) | Gas used in the current billing period        |
-| Billing period cost     | Cost accrued in the current billing period    |
-| Projected bill          | Upper estimate of the current month's bill    |
-| Daily gas (ft³)         | Gas used on the most recent day               |
-| Daily cost              | Cost for the most recent day                  |
-| Next meter read date    | Date of the next scheduled meter read         |
+| Sensor                   | Description                                   |
+| ------------------------ | --------------------------------------------- |
+| Billing period gas (CCF) | Gas used in the current billing period (CCF)  |
+| Billing period cost      | Cost accrued in the current billing period    |
+| Projected bill           | Upper estimate of the current month's bill    |
+| Daily gas (CCF)          | Gas used on the most recent day (CCF)         |
+| Daily cost               | Cost for the most recent day                  |
+| Next meter read date     | Date of the next scheduled meter read         |
 
 ## Installation
 

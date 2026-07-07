@@ -43,7 +43,7 @@ def _cost_for_billing_period(
 ) -> float:
     """Sum daily costs whose date falls within the billing period's date range."""
     period_end = period.date.date()
-    period_start = (period.date - timedelta(days=period.days_used)).date()
+    period_start = (period.date - timedelta(days=period.days_used - 1)).date()
     return sum(
         _safe_float(day.cost)
         for day in daily_usage
@@ -105,7 +105,7 @@ def _import_daily_statistics(
             name="Nicor Gas daily gas",
             source=DOMAIN,
             statistic_id=STAT_DAILY_GAS,
-            unit_of_measurement=UnitOfVolume.CUBIC_FEET,
+            unit_of_measurement=UnitOfVolume.CENTUM_CUBIC_FEET,
         ),
         gas_stats,
     )
@@ -154,7 +154,7 @@ def _import_billing_period_statistics(
             name="Nicor Gas billing period gas",
             source=DOMAIN,
             statistic_id=STAT_BILLING_GAS,
-            unit_of_measurement=UnitOfVolume.CUBIC_FEET,
+            unit_of_measurement=UnitOfVolume.CENTUM_CUBIC_FEET,
         ),
         gas_stats,
     )
