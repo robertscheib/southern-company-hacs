@@ -1,3 +1,7 @@
+> ⚠️ **This fork is no longer maintained.** Nicor Gas support has been merged upstream ([PR #121](https://github.com/Southern-Company-HA/southern-company-hacs/pull/121)).
+>
+> 👉 **Use the official repo:** [Southern-Company-HA/southern-company-hacs](https://github.com/Southern-Company-HA/southern-company-hacs)
+
 # Southern Company HACS
 
 [![GitHub Release][releases-shield]][releases]
